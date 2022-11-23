@@ -22,10 +22,14 @@ contract uberDrive{
         bool arrived;
         uint timePicked;
         uint timeDestination ;    
+        uint successfulRide;
+        address currentRider;
     }
 
     struct riderDetails{
         address ridersAddress;
+        uint ridefee;
+        bool needride;
         bool registered;
         bool ridepicked;
         bool paid;
@@ -33,6 +37,7 @@ contract uberDrive{
 
     address[] driversAddress;
     address[] driverReviewers;
+    address[] ridersAddress;
 
     mapping(address => driverDetails) driverdetails;
     mapping(address => riderDetails) riderdetails;
@@ -65,11 +70,15 @@ contract uberDrive{
         require(rd.registered == false, "already registered");
         rd.ridersAddress = msg.sender;
         rd.registered = true;
+        ridersAddress.push(msg.sender);
+
     }
 
     function orderRide() public {
         riderDetails storage rd = riderdetails[msg.sender];
         require(rd.registered == true, "not registered");
+        require(rd.needride == false, "You have a ride in progress/you have balance to pay");
+        rd.needride = true;
 
     }
 
@@ -80,21 +89,37 @@ contract uberDrive{
         require(dd.booked == false, "already booked");
         dd.timePicked = block.timestamp;
         dd.booked = true;
+
+        for (uint i=0; i<ridersAddress.length; i++) {
+            if(riderdetails[ridersAddress[i]].needride == true){
+                dd.currentRider = ridersAddress[i];     
+            }
+             
+        }
         
     }
 
-    function payFee () public {
+    function payFee () public payable{
         riderDetails storage rd = riderdetails[msg.sender];
-
+        require(rd.paid == false, "already paid");
+        uint amount = rd.ridefee;
+        payable(address(this)).transfer(amount);
+        rd.ridefee = 0;
+        rd.paid = true;
     }
 
     function endride() public{
         driverDetails storage dd = driverdetails[msg.sender];
         require(dd.booked == true, "you have no active ride");
         dd.timeDestination = block.timestamp;
-        dd.booked = false;
 
         uint amount = calcFee();
+
+        riderDetails storage rd = riderdetails[dd.currentRider];
+        rd.ridefee = amount;
+        dd.currentRider = address(0);
+        dd.booked = false;
+        dd.successfulRide += 1;
     }
 
     function addReviewers(address reviewersAddress) public onlyOwner{
