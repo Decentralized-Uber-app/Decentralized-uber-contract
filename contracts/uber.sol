@@ -58,8 +58,8 @@ contract uberDrive{
         driversAddress.push(msg.sender);
     }
 
-    function reviewDriver(address driversAddress) public{
-        driverDetails storage dd = driverdetails[driversAddress];
+    function reviewDriver(address _driversAddress) public{
+        driverDetails storage dd = driverdetails[_driversAddress];
         dd.approved = true;
     }
 
