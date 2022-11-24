@@ -1,8 +1,16 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.13;
+pragma solidity ^0.8.9;
 
-contract uberDrive{
+// Uncomment this line to use console.log
+// import "hardhat/console.sol";
+
+contract Uber {
+
+    // STATE VARIABLES //
     address owner;
+    address[] driversAddress;
+    address[] driverReviewers;
+    address[] ridersAddress;
 
     constructor() {
         owner == msg.sender;
@@ -35,17 +43,10 @@ contract uberDrive{
         bool paid;
     }
 
-    address[] driversAddress;
-    address[] driverReviewers;
-    address[] ridersAddress;
 
     mapping(address => driverDetails) driverdetails;
     mapping(address => riderDetails) riderdetails;
 
-    // modifier registered(){
-    //     riderDetails storage rd = riderdetails[msg.sender];
-    //     require(rd)
-    // }
 
     ///Drivers ////
     function driversRegister(string memory _drivername) public {
