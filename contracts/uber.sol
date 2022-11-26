@@ -4,6 +4,8 @@ pragma solidity ^0.8.9;
 // Uncomment this line to use console.log
 // import "hardhat/console.sol";
 
+ import "./usersVault.sol";
+ import "./driverVault.sol";
 contract Uber {
 
     // STATE VARIABLES //
@@ -11,6 +13,8 @@ contract Uber {
     address[] driversAddress;
     address[] driverReviewers;
     address[] ridersAddress;
+    address[] approvedDrivers;
+    address tokenAddress;
 
     constructor() {
         owner == msg.sender;
@@ -24,6 +28,7 @@ contract Uber {
     struct driverDetails{
         address driversAddress;
         string driversName;
+        string driversLicense;
         bool registered;
         bool approved;
         bool booked;
@@ -32,6 +37,7 @@ contract Uber {
         uint timeDestination ;    
         uint successfulRide;
         address currentRider;
+        driverVault vaultAddress;
     }
 
     struct riderDetails{
@@ -41,6 +47,7 @@ contract Uber {
         bool registered;
         bool ridepicked;
         bool paid;
+        userVault vaultAddress;
     }
 
 
@@ -49,30 +56,32 @@ contract Uber {
 
 
     ///Drivers ////
-    function driversRegister(string memory _drivername) public {
+    function driversRegister(string memory _drivername, string memory _driverslicense) public {
         driverDetails storage dd = driverdetails[msg.sender];
         require(dd.registered == false, "already registered");
         dd.driversAddress = msg.sender;
         dd.driversName = _drivername;
         dd.registered = true;
-        dd.approved = false;
+        dd.driversLicense = _driverslicense;
         driversAddress.push(msg.sender);
     }
 
     function reviewDriver(address _driversAddress) public{
         driverDetails storage dd = driverdetails[_driversAddress];
         dd.approved = true;
+        driverVault newVault = new driverVault(_driversAddress, tokenAddress);
+        dd.vaultAddress = newVault;
     }
 
-
     //Riders////////
-    function ridersRegistration() public {
+    function userRegistration() public {
         riderDetails storage rd = riderdetails[msg.sender];
         require(rd.registered == false, "already registered");
         rd.ridersAddress = msg.sender;
         rd.registered = true;
         ridersAddress.push(msg.sender);
-
+        userVault newVault = new userVault(msg.sender, tokenAddress);
+        rd.vaultAddress = newVault;
     }
 
     function orderRide() public {
@@ -80,25 +89,25 @@ contract Uber {
         require(rd.registered == true, "not registered");
         require(rd.needride == false, "You have a ride in progress/you have balance to pay");
         rd.needride = true;
-
     }
 
-    function pickRide() public {
-        driverDetails storage dd = driverdetails[msg.sender];
-        require(dd.registered == true, "not registered");
-        require(dd.approved == true, "approval still pendind");
-        require(dd.booked == false, "already booked");
-        dd.timePicked = block.timestamp;
-        dd.booked = true;
+    // Function needs to be worked on (Avoid loop in a write function)
+    // function pickRide() public {
+    //     driverDetails storage dd = driverdetails[msg.sender];
+    //     require(dd.registered == true, "not registered");
+    //     require(dd.approved == true, "approval still pendind");
+    //     require(dd.booked == false, "already booked");
+    //     dd.timePicked = block.timestamp;
+    //     dd.booked = true;
 
-        for (uint i=0; i<ridersAddress.length; i++) {
-            if(riderdetails[ridersAddress[i]].needride == true){
-                dd.currentRider = ridersAddress[i];     
-            }
+    //     for (uint i=0; i<ridersAddress.length; i++) {
+    //         if(riderdetails[ridersAddress[i]].needride == true){
+    //             dd.currentRider = ridersAddress[i];     
+    //         }
              
-        }
+    //     }
         
-    }
+    // }
 
     function payFee () public payable{
         riderDetails storage rd = riderdetails[msg.sender];
@@ -117,7 +126,7 @@ contract Uber {
         uint amount = calcFee();
 
         riderDetails storage rd = riderdetails[dd.currentRider];
-        rd.ridefee = amount;
+     //   rd.ridefee = amount;
         dd.currentRider = address(0);
         dd.booked = false;
         dd.successfulRide += 1;
@@ -127,7 +136,7 @@ contract Uber {
         driverReviewers.push(reviewersAddress);
     }
 
-    function calcFee() internal returns(uint256){
+    function calcFee() internal view returns(uint256){
         driverDetails storage dd = driverdetails[msg.sender];
         uint timepicked = dd.timePicked;
         uint timereach = dd.timeDestination;
@@ -136,7 +145,10 @@ contract Uber {
         uint amountToPay = totalTime * 2;
 
         return amountToPay;
+    }
 
+    function setContractAddress (address _tokenAddress) public {
+        tokenAddress = _tokenAddress;
     }
 
     
