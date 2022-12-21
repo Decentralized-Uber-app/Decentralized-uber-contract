@@ -2,10 +2,10 @@
 pragma solidity ^0.8.9;
 
 import "./IERC20.sol";
-contract userVault {
+contract UserVault {
     address owner;
     IERC20 contractAddress;
-    uint216 balance; 
+    uint216 balance;
     constructor (address _owner, address _contractAddress) {
         owner = _owner;
         contractAddress = IERC20(_contractAddress);
@@ -30,7 +30,7 @@ contract userVault {
     }
 
     function transferTodriver (address _addr, uint216 _amount) external {
-         uint216 bal = uint216(IERC20(contractAddress).balanceOf(address(this)));
+        uint216 bal = uint216(IERC20(contractAddress).balanceOf(address(this)));
         require(bal > _amount, "Amount higher than balance");
         balance -= _amount;
         IERC20(contractAddress).transfer(_addr, _amount);
