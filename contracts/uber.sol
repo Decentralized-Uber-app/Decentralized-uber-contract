@@ -3,9 +3,9 @@ pragma solidity ^0.8.9;
 
 // Uncomment this line to use console.log
 // import "hardhat/console.sol";
+import "./UserVault.sol";
+import "./DriverVault.sol";
 
- import "./usersVault.sol";
- import "./driverVault.sol";
 contract Uber {
 
     // STATE VARIABLES //
@@ -25,7 +25,7 @@ contract Uber {
         _;
     }
 
-    struct driverDetails{
+    struct DriverDetails{
         address driversAddress;
         string driversName;
         string driversLicense;
@@ -34,30 +34,30 @@ contract Uber {
         bool booked;
         bool arrived;
         uint timePicked;
-        uint timeDestination ;    
+        uint timeDestination;
         uint successfulRide;
         address currentRider;
-        driverVault vaultAddress;
+        DriverVault vaultAddress;
     }
 
-    struct riderDetails{
+    struct RiderDetails{
         address ridersAddress;
         uint ridefee;
         bool needride;
         bool registered;
         bool ridepicked;
         bool paid;
-        userVault vaultAddress;
+        UserVault vaultAddress;
     }
 
 
-    mapping(address => driverDetails) driverdetails;
-    mapping(address => riderDetails) riderdetails;
+    mapping(address => DriverDetails) driverdetails;
+    mapping(address => RiderDetails) riderdetails;
 
 
     ///Drivers ////
     function driversRegister(string memory _drivername, string memory _driverslicense) public {
-        driverDetails storage dd = driverdetails[msg.sender];
+        DriverDetails storage dd = driverdetails[msg.sender];
         require(dd.registered == false, "already registered");
         dd.driversAddress = msg.sender;
         dd.driversName = _drivername;
@@ -67,25 +67,25 @@ contract Uber {
     }
 
     function reviewDriver(address _driversAddress) public{
-        driverDetails storage dd = driverdetails[_driversAddress];
+        DriverDetails storage dd = driverdetails[_driversAddress];
         dd.approved = true;
-        driverVault newVault = new driverVault(_driversAddress, tokenAddress);
+        DriverVault newVault = new DriverVault(_driversAddress, tokenAddress);
         dd.vaultAddress = newVault;
     }
 
     //Riders////////
     function userRegistration() public {
-        riderDetails storage rd = riderdetails[msg.sender];
+        RiderDetails storage rd = riderdetails[msg.sender];
         require(rd.registered == false, "already registered");
         rd.ridersAddress = msg.sender;
         rd.registered = true;
         ridersAddress.push(msg.sender);
-        userVault newVault = new userVault(msg.sender, tokenAddress);
+        UserVault newVault = new UserVault(msg.sender, tokenAddress);
         rd.vaultAddress = newVault;
     }
 
     function orderRide() public {
-        riderDetails storage rd = riderdetails[msg.sender];
+        RiderDetails storage rd = riderdetails[msg.sender];
         require(rd.registered == true, "not registered");
         require(rd.needride == false, "You have a ride in progress/you have balance to pay");
         rd.needride = true;
@@ -110,7 +110,7 @@ contract Uber {
     // }
 
     function payFee () public payable{
-        riderDetails storage rd = riderdetails[msg.sender];
+        RiderDetails storage rd = riderdetails[msg.sender];
         require(rd.paid == false, "already paid");
         uint amount = rd.ridefee;
         payable(address(this)).transfer(amount);
@@ -119,13 +119,13 @@ contract Uber {
     }
 
     function endride() public{
-        driverDetails storage dd = driverdetails[msg.sender];
+        DriverDetails storage dd = driverdetails[msg.sender];
         require(dd.booked == true, "you have no active ride");
         dd.timeDestination = block.timestamp;
 
         uint amount = calcFee();
 
-        riderDetails storage rd = riderdetails[dd.currentRider];
+        RiderDetails storage rd = riderdetails[dd.currentRider];
      //   rd.ridefee = amount;
         dd.currentRider = address(0);
         dd.booked = false;
@@ -137,7 +137,7 @@ contract Uber {
     }
 
     function calcFee() internal view returns(uint256){
-        driverDetails storage dd = driverdetails[msg.sender];
+        DriverDetails storage dd = driverdetails[msg.sender];
         uint timepicked = dd.timePicked;
         uint timereach = dd.timeDestination;
         uint totalTime = timereach - timepicked;
@@ -150,6 +150,5 @@ contract Uber {
     function setContractAddress (address _tokenAddress) public {
         tokenAddress = _tokenAddress;
     }
-
     
 }
