@@ -15,6 +15,8 @@ contract Uber {
     address[] ridersAddress;
     address[] approvedDrivers;
     address tokenAddress;
+    uint public driveFeePerTime;
+    uint public driveFeePerDistance;
 
     constructor() {
         owner == msg.sender;
@@ -31,10 +33,11 @@ contract Uber {
         string driversLicense;
         bool registered;
         bool approved;
-        bool booked;
-        bool arrived;
+        bool available;
+        bool rideRequest; // when a user request for ride
+        bool acceptRide; // Driver accepts requested 
+        bool booked; // When driver accepts ride
         uint timePicked;
-        uint timeDestination;
         uint successfulRide;
         address currentRider;
         DriverVault vaultAddress;
@@ -42,11 +45,8 @@ contract Uber {
 
     struct RiderDetails{
         address ridersAddress;
-        uint ridefee;
-        bool needride;
         bool registered;
         bool ridepicked;
-        bool paid;
         UserVault vaultAddress;
     }
 
@@ -80,75 +80,84 @@ contract Uber {
         rd.ridersAddress = msg.sender;
         rd.registered = true;
         ridersAddress.push(msg.sender);
-        UserVault newVault = new UserVault(msg.sender, tokenAddress);
+        UserVault newVault = new UserVault(msg.sender, tokenAddress, address(this));
         rd.vaultAddress = newVault;
     }
 
-    function orderRide() public {
+    function orderRide(address _driver, uint _distance) public {
         RiderDetails storage rd = riderdetails[msg.sender];
+        address ridersVault = address(rd.vaultAddress);
+        uint estimatedDriveFee =  calFeeEstimate(_distance);
+        require(IERC20(tokenAddress).balanceOf(ridersVault) >= estimatedDriveFee, "Low balance");
         require(rd.registered == true, "not registered");
-        require(rd.needride == false, "You have a ride in progress/you have balance to pay");
-        rd.needride = true;
+        require(rd.ridepicked == false, "You have a ride in progress/you have balance to pay");
+        DriverDetails storage DD = driverdetails[_driver];
+        require(DD.booked == false, "Rider booked");
+        require(DD.available == true, "Driver not available");
+        DD.rideRequest = true;
+        DD.currentRider = msg.sender;
+        rd.ridepicked = true;
     }
 
-    // Function needs to be worked on (Avoid loop in a write function)
-    // function pickRide() public {
-    //     driverDetails storage dd = driverdetails[msg.sender];
-    //     require(dd.registered == true, "not registered");
-    //     require(dd.approved == true, "approval still pendind");
-    //     require(dd.booked == false, "already booked");
-    //     dd.timePicked = block.timestamp;
-    //     dd.booked = true;
-
-    //     for (uint i=0; i<ridersAddress.length; i++) {
-    //         if(riderdetails[ridersAddress[i]].needride == true){
-    //             dd.currentRider = ridersAddress[i];     
-    //         }
-             
-    //     }
-        
-    // }
-
-    function payFee () public payable{
-        RiderDetails storage rd = riderdetails[msg.sender];
-        require(rd.paid == false, "already paid");
-        uint amount = rd.ridefee;
-        payable(address(this)).transfer(amount);
-        rd.ridefee = 0;
-        rd.paid = true;
+    function driverAcceptRide ()public {
+       DriverDetails storage DD = driverdetails[msg.sender];
+       require(DD.rideRequest == true, "No ride requested");
+       DD.booked = true;
+       DD.timePicked = block.timestamp;
     }
+  
 
     function endride() public{
         DriverDetails storage dd = driverdetails[msg.sender];
-        require(dd.booked == true, "you have no active ride");
-        dd.timeDestination = block.timestamp;
-
-        uint amount = calcFee();
-
         RiderDetails storage rd = riderdetails[dd.currentRider];
-     //   rd.ridefee = amount;
+        require(dd.booked == true, "you have no active ride");
+        uint amount = calcRealFee(dd.driversAddress);
+        IERC20(tokenAddress).transferFrom(address(rd.vaultAddress), address(dd.vaultAddress), amount);
         dd.currentRider = address(0);
         dd.booked = false;
+        dd.acceptRide = false;
+        dd.rideRequest = false;
         dd.successfulRide += 1;
+        rd.ridepicked = false;
     }
 
     function addReviewers(address reviewersAddress) public onlyOwner{
         driverReviewers.push(reviewersAddress);
     }
 
-    function calcFee() internal view returns(uint256){
-        DriverDetails storage dd = driverdetails[msg.sender];
-        uint timepicked = dd.timePicked;
-        uint timereach = dd.timeDestination;
-        uint totalTime = timereach - timepicked;
+    function calFeeEstimate (uint _distance) public view returns(uint estimateFee) {
+        estimateFee = _distance * driveFeePerDistance;
+    }
 
-        uint amountToPay = totalTime * 2;
+    function isUserInRide (address _owner) public view returns (bool rideOngoing) {
+        RiderDetails memory rd = riderdetails[_owner];
+        rideOngoing = rd.ridepicked;
+    }
 
-        return amountToPay;
+    function calcRealFee(address driverAddress) internal view returns(uint256 amountToPay){
+        DriverDetails storage dd = driverdetails[driverAddress];
+        uint totalTime = block.timestamp - dd.timePicked;
+         amountToPay = totalTime * driveFeePerTime;
+    }
+
+
+    function setRideFeePerTime (uint fee) external onlyOwner {
+        driveFeePerTime = fee;
+    }
+
+    function setRideFeePerDistance (uint fee) external onlyOwner {
+        driveFeePerDistance = fee;
     }
 
     function setContractAddress (address _tokenAddress) public {
         tokenAddress = _tokenAddress;
+    }
+
+    function viewAllDrivers () public view returns(address[] memory) {
+        return driversAddress;
+    }
+    function viewAllRiders () public view returns(address[] memory) {
+        return ridersAddress;
     }
     
 }

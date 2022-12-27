@@ -2,13 +2,16 @@
 pragma solidity ^0.8.9;
 
 import "./IERC20.sol";
+import "./uber.sol";
 contract UserVault {
     address owner;
     IERC20 contractAddress;
     uint216 balance;
-    constructor (address _owner, address _contractAddress) {
+    Uber uberAddress;
+    constructor (address _owner, address _contractAddress,address _uberAddress) {
         owner = _owner;
         contractAddress = IERC20(_contractAddress);
+        uberAddress = Uber(_uberAddress);
     }
 
     modifier onlyOwner () {
@@ -23,6 +26,8 @@ contract UserVault {
     }
 
     function withdraw (uint216 _amount) external onlyOwner {
+        bool driveActive = Uber(uberAddress).isUserInRide(owner);
+        require(driveActive == false, "You are still in a ride");
         uint216 bal = uint216(IERC20(contractAddress).balanceOf(address(this)));
         require(bal > _amount, "Amount higher than balance");
         balance -= _amount;
