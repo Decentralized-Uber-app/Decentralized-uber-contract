@@ -30,7 +30,6 @@ contract Uber {
     struct DriverDetails{
         address driversAddress;
         string driversName;
-        string driversLicense;
         bool registered;
         bool approved;
         bool available;
@@ -56,13 +55,12 @@ contract Uber {
 
 
     ///Drivers ////
-    function driversRegister(string memory _drivername, string memory _driverslicense) public {
+    function driversRegister(string memory _drivername) public {
         DriverDetails storage dd = driverdetails[msg.sender];
         require(dd.registered == false, "already registered");
         dd.driversAddress = msg.sender;
         dd.driversName = _drivername;
         dd.registered = true;
-        dd.driversLicense = _driverslicense;
         driversAddress.push(msg.sender);
     }
 
@@ -119,6 +117,7 @@ contract Uber {
         dd.rideRequest = false;
         dd.successfulRide += 1;
         rd.ridepicked = false;
+        dd.timePicked = 0;
     }
 
     function addReviewers(address reviewersAddress) public onlyOwner{

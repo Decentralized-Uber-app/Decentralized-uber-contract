@@ -2,7 +2,7 @@
 pragma solidity ^0.8.9;
 
 import "./IERC20.sol";
-import "./uber.sol";
+import "./Uber.sol";
 contract UserVault {
     address owner;
     IERC20 contractAddress;
@@ -34,12 +34,12 @@ contract UserVault {
         IERC20(contractAddress).transfer(msg.sender, _amount);
     }
 
-    function transferTodriver (address _addr, uint216 _amount) external {
-        uint216 bal = uint216(IERC20(contractAddress).balanceOf(address(this)));
-        require(bal > _amount, "Amount higher than balance");
-        balance -= _amount;
-        IERC20(contractAddress).transfer(_addr, _amount);
-    }
+    // function transferTodriver (address _addr, uint216 _amount) external {
+    //     uint216 bal = uint216(IERC20(contractAddress).balanceOf(address(this)));
+    //     require(bal > _amount, "Amount higher than balance");
+    //     balance -= _amount;
+    //     IERC20(contractAddress).transfer(_addr, _amount);
+    // }
 
     
 }
