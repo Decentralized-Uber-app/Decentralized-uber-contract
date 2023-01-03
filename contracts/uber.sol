@@ -111,12 +111,8 @@ contract Uber {
         DriverDetails storage dd = driverdetails[msg.sender];
         RiderDetails storage rd = riderdetails[dd.currentRider];
         require(dd.booked == true, "you have no active ride");
-        dd.timeDestination = block.timestamp;
-
-        uint amount = calcFee();
-
-        riderDetails storage rd = riderdetails[dd.currentRider];
-        rd.ridefee = amount;
+        uint amount = calcRealFee(dd.driversAddress);
+        IERC20(tokenAddress).transferFrom(address(rd.vaultAddress), address(dd.vaultAddress), amount);
         dd.currentRider = address(0);
         dd.booked = false;
         dd.acceptRide = false;
