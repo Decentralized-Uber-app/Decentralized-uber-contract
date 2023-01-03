@@ -18,8 +18,9 @@ contract Uber {
     uint public driveFeePerTime;
     uint public driveFeePerDistance;
 
-    constructor() {
+    constructor(address _tokenAddress) {
         owner == msg.sender;
+        tokenAddress = _tokenAddress;
     }
 
     modifier onlyOwner(){
@@ -66,7 +67,7 @@ contract Uber {
         driversAddress.push(msg.sender);
     }
 
-    function reviewDriver(address _driversAddress) public{
+    function reviewDriver(address _driversAddress) public onlyOwner{
         DriverDetails storage dd = driverdetails[_driversAddress];
         dd.approved = true;
         DriverVault newVault = new DriverVault(_driversAddress, tokenAddress);
@@ -153,11 +154,15 @@ contract Uber {
         tokenAddress = _tokenAddress;
     }
 
-    function viewAllDrivers () public view returns(address[] memory) {
+    function viewAllDrivers () external view returns(address[] memory) {
         return driversAddress;
     }
-    function viewAllRiders () public view returns(address[] memory) {
+    function viewAllRiders () external view returns(address[] memory) {
         return ridersAddress;
+    }
+
+    function changeTokenAddress(address _newTokenAddress) external{
+        tokenAddress = _newTokenAddress;
     }
     
 }
