@@ -3,9 +3,9 @@ pragma solidity ^0.8.9;
 
 // Uncomment this line to use console.log
 // import "hardhat/console.sol";
+import "./UserVault.sol";
+import "./DriverVault.sol";
 
- import "./usersVault.sol";
- import "./driverVault.sol";
 contract Uber {
 
     // STATE VARIABLES //
@@ -15,9 +15,12 @@ contract Uber {
     address[] ridersAddress;
     address[] approvedDrivers;
     address tokenAddress;
+    uint public driveFeePerTime;
+    uint public driveFeePerDistance;
 
-    constructor() {
+    constructor(address _tokenAddress) {
         owner == msg.sender;
+        tokenAddress = _tokenAddress;
     }
 
     modifier onlyOwner(){
@@ -25,39 +28,37 @@ contract Uber {
         _;
     }
 
-    struct driverDetails{
+    struct DriverDetails{
         address driversAddress;
         string driversName;
         string driversLicense;
         bool registered;
         bool approved;
-        bool booked;
-        bool arrived;
+        bool available;
+        bool rideRequest; // when a user request for ride
+        bool acceptRide; // Driver accepts requested 
+        bool booked; // When driver accepts ride
         uint timePicked;
-        uint timeDestination ;    
         uint successfulRide;
         address currentRider;
-        driverVault vaultAddress;
+        DriverVault vaultAddress;
     }
 
-    struct riderDetails{
+    struct RiderDetails{
         address ridersAddress;
-        uint ridefee;
-        bool needride;
         bool registered;
         bool ridepicked;
-        bool paid;
-        userVault vaultAddress;
+        UserVault vaultAddress;
     }
 
 
-    mapping(address => driverDetails) driverdetails;
-    mapping(address => riderDetails) riderdetails;
+    mapping(address => DriverDetails) driverdetails;
+    mapping(address => RiderDetails) riderdetails;
 
 
     ///Drivers ////
     function driversRegister(string memory _drivername, string memory _driverslicense) public {
-        driverDetails storage dd = driverdetails[msg.sender];
+        DriverDetails storage dd = driverdetails[msg.sender];
         require(dd.registered == false, "already registered");
         dd.driversAddress = msg.sender;
         dd.driversName = _drivername;
@@ -66,90 +67,102 @@ contract Uber {
         driversAddress.push(msg.sender);
     }
 
-    function reviewDriver(address _driversAddress) public{
-        driverDetails storage dd = driverdetails[_driversAddress];
+    function reviewDriver(address _driversAddress) public onlyOwner{
+        DriverDetails storage dd = driverdetails[_driversAddress];
         dd.approved = true;
-        driverVault newVault = new driverVault(_driversAddress, tokenAddress);
+        DriverVault newVault = new DriverVault(_driversAddress, tokenAddress);
         dd.vaultAddress = newVault;
     }
 
     //Riders////////
     function userRegistration() public {
-        riderDetails storage rd = riderdetails[msg.sender];
+        RiderDetails storage rd = riderdetails[msg.sender];
         require(rd.registered == false, "already registered");
         rd.ridersAddress = msg.sender;
         rd.registered = true;
         ridersAddress.push(msg.sender);
-        userVault newVault = new userVault(msg.sender, tokenAddress);
+        UserVault newVault = new UserVault(msg.sender, tokenAddress, address(this));
         rd.vaultAddress = newVault;
     }
 
-    function orderRide() public {
-        riderDetails storage rd = riderdetails[msg.sender];
+    function orderRide(address _driver, uint _distance) public {
+        RiderDetails storage rd = riderdetails[msg.sender];
+        address ridersVault = address(rd.vaultAddress);
+        uint estimatedDriveFee =  calFeeEstimate(_distance);
+        require(IERC20(tokenAddress).balanceOf(ridersVault) >= estimatedDriveFee, "Low balance");
         require(rd.registered == true, "not registered");
-        require(rd.needride == false, "You have a ride in progress/you have balance to pay");
-        rd.needride = true;
+        require(rd.ridepicked == false, "You have a ride in progress/you have balance to pay");
+        DriverDetails storage DD = driverdetails[_driver];
+        require(DD.booked == false, "Rider booked");
+        require(DD.available == true, "Driver not available");
+        DD.rideRequest = true;
+        DD.currentRider = msg.sender;
+        rd.ridepicked = true;
     }
 
-    // Function needs to be worked on (Avoid loop in a write function)
-    // function pickRide() public {
-    //     driverDetails storage dd = driverdetails[msg.sender];
-    //     require(dd.registered == true, "not registered");
-    //     require(dd.approved == true, "approval still pendind");
-    //     require(dd.booked == false, "already booked");
-    //     dd.timePicked = block.timestamp;
-    //     dd.booked = true;
-
-    //     for (uint i=0; i<ridersAddress.length; i++) {
-    //         if(riderdetails[ridersAddress[i]].needride == true){
-    //             dd.currentRider = ridersAddress[i];     
-    //         }
-             
-    //     }
-        
-    // }
-
-    function payFee () public payable{
-        riderDetails storage rd = riderdetails[msg.sender];
-        require(rd.paid == false, "already paid");
-        uint amount = rd.ridefee;
-        payable(address(this)).transfer(amount);
-        rd.ridefee = 0;
-        rd.paid = true;
+    function driverAcceptRide ()public {
+       DriverDetails storage DD = driverdetails[msg.sender];
+       require(DD.rideRequest == true, "No ride requested");
+       DD.booked = true;
+       DD.timePicked = block.timestamp;
     }
+  
 
     function endride() public{
-        driverDetails storage dd = driverdetails[msg.sender];
+        DriverDetails storage dd = driverdetails[msg.sender];
+        RiderDetails storage rd = riderdetails[dd.currentRider];
         require(dd.booked == true, "you have no active ride");
-        dd.timeDestination = block.timestamp;
-
-        uint amount = calcFee();
-
-        riderDetails storage rd = riderdetails[dd.currentRider];
-     //   rd.ridefee = amount;
+        uint amount = calcRealFee(dd.driversAddress);
+        IERC20(tokenAddress).transferFrom(address(rd.vaultAddress), address(dd.vaultAddress), amount);
         dd.currentRider = address(0);
         dd.booked = false;
+        dd.acceptRide = false;
+        dd.rideRequest = false;
         dd.successfulRide += 1;
+        rd.ridepicked = false;
     }
 
     function addReviewers(address reviewersAddress) public onlyOwner{
         driverReviewers.push(reviewersAddress);
     }
 
-    function calcFee() internal view returns(uint256){
-        driverDetails storage dd = driverdetails[msg.sender];
-        uint timepicked = dd.timePicked;
-        uint timereach = dd.timeDestination;
-        uint totalTime = timereach - timepicked;
+    function calFeeEstimate (uint _distance) public view returns(uint estimateFee) {
+        estimateFee = _distance * driveFeePerDistance;
+    }
 
-        uint amountToPay = totalTime * 2;
+    function isUserInRide (address _owner) public view returns (bool rideOngoing) {
+        RiderDetails memory rd = riderdetails[_owner];
+        rideOngoing = rd.ridepicked;
+    }
 
-        return amountToPay;
+    function calcRealFee(address driverAddress) internal view returns(uint256 amountToPay){
+        DriverDetails storage dd = driverdetails[driverAddress];
+        uint totalTime = block.timestamp - dd.timePicked;
+         amountToPay = totalTime * driveFeePerTime;
+    }
+
+
+    function setRideFeePerTime (uint fee) external onlyOwner {
+        driveFeePerTime = fee;
+    }
+
+    function setRideFeePerDistance (uint fee) external onlyOwner {
+        driveFeePerDistance = fee;
     }
 
     function setContractAddress (address _tokenAddress) public {
         tokenAddress = _tokenAddress;
     }
 
+    function viewAllDrivers () external view returns(address[] memory) {
+        return driversAddress;
+    }
+    function viewAllRiders () external view returns(address[] memory) {
+        return ridersAddress;
+    }
+
+    function changeTokenAddress(address _newTokenAddress) external{
+        tokenAddress = _newTokenAddress;
+    }
     
 }
