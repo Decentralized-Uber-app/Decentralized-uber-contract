@@ -69,6 +69,7 @@ contract Uber {
 
     function reviewDriver(address _driversAddress) public onlyOwner{
         DriverDetails storage dd = driverdetails[_driversAddress];
+        require(dd.driversAddress == _driversAddress, "Driver not registered");
         dd.approved = true;
         DriverVault newVault = new DriverVault(_driversAddress, tokenAddress);
         dd.vaultAddress = newVault;
