@@ -19,7 +19,7 @@ contract Uber {
     uint public driveFeePerDistance;
 
     constructor(address _tokenAddress) {
-        owner == msg.sender;
+        owner = msg.sender;
         tokenAddress = _tokenAddress;
     }
 
