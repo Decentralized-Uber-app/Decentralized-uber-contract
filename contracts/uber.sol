@@ -6,8 +6,13 @@ pragma solidity ^0.8.9;
 import "./UserVault.sol";
 import "./DriverVault.sol";
 
-contract Uber {
+import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 
+contract Uber is Initializable, AccessControlUpgradeable{
+
+    bytes32 public constant REVIEWER_ROLE = keccak256("REVIEWER_ROLE");
+  
     // STATE VARIABLES //
     address owner;
     address[] driversAddress;
@@ -23,9 +28,11 @@ contract Uber {
         tokenAddress = _tokenAddress;
     }
 
-    modifier onlyOwner(){
-        require(msg.sender == owner, "not an admin");
-        _;
+    function initialize() public initializer {
+
+        __AccessControl_init();
+        _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
+        _grantRole(REVIEWER_ROLE, msg.sender);
     }
 
     struct DriverDetails{
@@ -67,7 +74,7 @@ contract Uber {
         driversAddress.push(msg.sender);
     }
 
-    function reviewDriver(address _driversAddress) public onlyOwner{
+    function reviewDriver(address _driversAddress) public onlyRole(REVIEWER_ROLE){
         DriverDetails storage dd = driverdetails[_driversAddress];
         require(dd.driversAddress == _driversAddress, "Driver not registered");
         dd.approved = true;
@@ -123,10 +130,6 @@ contract Uber {
         rd.ridepicked = false;
     }
 
-    function addReviewers(address reviewersAddress) public onlyOwner{
-        driverReviewers.push(reviewersAddress);
-    }
-
     function calFeeEstimate (uint _distance) public view returns(uint estimateFee) {
         estimateFee = _distance * driveFeePerDistance;
     }
@@ -143,11 +146,11 @@ contract Uber {
     }
 
 
-    function setRideFeePerTime (uint fee) external onlyOwner {
+    function setRideFeePerTime (uint fee) external onlyRole(DEFAULT_ADMIN_ROLE) {
         driveFeePerTime = fee;
     }
 
-    function setRideFeePerDistance (uint fee) external onlyOwner {
+    function setRideFeePerDistance (uint fee) external onlyRole(DEFAULT_ADMIN_ROLE) {
         driveFeePerDistance = fee;
     }
 

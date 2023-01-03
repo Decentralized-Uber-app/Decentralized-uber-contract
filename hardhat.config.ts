@@ -14,14 +14,14 @@ const config: HardhatUserConfig = {
   },
   networks: {
     mumbai: {
-      url: process.env.MUMBAI,
+      url: process.env.ALCHEMY_GOERLI_API_KEY_URL,
       // @ts-ignore
-      accounts: [process.env.PRIVATE_KEY_1]
+      accounts: [process.env.ACCOUNT_PRIVATE_KEY]
     }
   },
   etherscan: {
     apiKey: {
-      polygonMumbai: "1PUJPJGSC1I7S7CPZVBQE8N5BB1A3ZK5RN"
+      polygonMumbai: "TTVCBmWUC4PuCmW3X51eCzLZd0v_F3nE"
     }
   }
 };
