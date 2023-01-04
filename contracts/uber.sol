@@ -6,7 +6,7 @@ pragma solidity ^0.8.9;
 import "./UserVault.sol";
 import "./DriverVault.sol";
 
-import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
+import "./AccessControlUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 
 contract Uber is Initializable, AccessControlUpgradeable{
@@ -14,7 +14,7 @@ contract Uber is Initializable, AccessControlUpgradeable{
     bytes32 public constant REVIEWER_ROLE = keccak256("REVIEWER_ROLE");
   
     // STATE VARIABLES //
-    address owner;
+    address admin;
     address[] driversAddress;
     address[] driverReviewers;
     address[] ridersAddress;
@@ -24,11 +24,12 @@ contract Uber is Initializable, AccessControlUpgradeable{
     uint public driveFeePerDistance;
 
     constructor(address _tokenAddress) {
-        owner = msg.sender;
+        admin = msg.sender;
         tokenAddress = _tokenAddress;
     }
 
     function initialize() public initializer {
+        require(msg.sender == admin, "not admin");
 
         __AccessControl_init();
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
