@@ -3,7 +3,7 @@ pragma solidity ^0.8.9;
 
 // Uncomment this line to use console.log
 // import "hardhat/console.sol";
-import "./UserVault.sol";
+import "./PassengerVault.sol";
 import "./DriverVault.sol";
 
 import "./AccessControlUpgradeable.sol";
@@ -12,12 +12,12 @@ import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 contract Uber is Initializable, AccessControlUpgradeable{
 
     bytes32 public constant REVIEWER_ROLE = keccak256("REVIEWER_ROLE");
-  
+
     // STATE VARIABLES //
     address admin;
     address[] driversAddress;
     address[] driverReviewers;
-    address[] ridersAddress;
+    address[] passengersAddress;
     address[] approvedDrivers;
     address tokenAddress;
     uint public driveFeePerTime;
@@ -39,96 +39,99 @@ contract Uber is Initializable, AccessControlUpgradeable{
     struct DriverDetails{
         address driversAddress;
         string driversName;
-        string driversLicense;
+        uint112 driversLicenseIdNo;
         bool registered;
         bool approved;
         bool available;
-        bool rideRequest; // when a user request for ride
-        bool acceptRide; // Driver accepts requested 
+        bool rideRequest; // When a user request for ride
+        bool acceptRide; // Driver accepts requested
         bool booked; // When driver accepts ride
         uint timePicked;
         uint successfulRide;
-        address currentRider;
+        address currentPassenger;
         DriverVault vaultAddress;
     }
 
-    struct RiderDetails{
-        address ridersAddress;
+    struct PassengerDetails{
+        address passengerAddress;
         bool registered;
         bool ridepicked;
-        UserVault vaultAddress;
+        PassengerVault vaultAddress;
     }
 
-
-    mapping(address => DriverDetails) driverdetails;
-    mapping(address => RiderDetails) riderdetails;
+    mapping(address => DriverDetails) driverDetails;
+    mapping(address => PassengerDetails) passengerDetails;
 
 
     ///Drivers ////
-    function driversRegister(string memory _drivername, string memory _driverslicense) public {
-        DriverDetails storage dd = driverdetails[msg.sender];
+    function driversRegister(string memory _drivername, uint112 _driversLicenseIdNo) public {
+        DriverDetails storage dd = driverDetails[msg.sender];
         require(dd.registered == false, "already registered");
         dd.driversAddress = msg.sender;
         dd.driversName = _drivername;
         dd.registered = true;
-        dd.driversLicense = _driverslicense;
-        driversAddress.push(msg.sender);
+        dd.driversLicenseIdNo = _driversLicenseIdNo;
+        driversAddress.push(msg.sender); // Where are you pushing this. I can't find the array
     }
 
     function reviewDriver(address _driversAddress) public onlyRole(REVIEWER_ROLE){
-        DriverDetails storage dd = driverdetails[_driversAddress];
+        DriverDetails storage dd = driverDetails[_driversAddress];
         require(dd.driversAddress == _driversAddress, "Driver not registered");
         dd.approved = true;
+
+        // deploy a new driver vault contract for the driver whose address is passed
         DriverVault newVault = new DriverVault(_driversAddress, tokenAddress);
         dd.vaultAddress = newVault;
     }
 
-    //Riders////////
-    function userRegistration() public {
-        RiderDetails storage rd = riderdetails[msg.sender];
-        require(rd.registered == false, "already registered");
-        rd.ridersAddress = msg.sender;
-        rd.registered = true;
-        ridersAddress.push(msg.sender);
-        UserVault newVault = new UserVault(msg.sender, tokenAddress, address(this));
-        rd.vaultAddress = newVault;
+    //Passenger////////
+    function passengerRegistration() public {
+        PassengerDetails storage pd = passengerDetails[msg.sender];
+        require(pd.registered == false, "already registered");
+        pd.passengerAddress = msg.sender;
+        pd.registered = true;
+        passengersAddress.push(msg.sender);
+
+        // deploy a new passenger vault contract for the passenger whose address is passed
+        PassengerVault newVault = new PassengerVault(msg.sender, tokenAddress, address(this));
+        pd.vaultAddress = newVault;
     }
 
     function orderRide(address _driver, uint _distance) public {
-        RiderDetails storage rd = riderdetails[msg.sender];
-        address ridersVault = address(rd.vaultAddress);
-        uint estimatedDriveFee =  calFeeEstimate(_distance);
-        require(IERC20(tokenAddress).balanceOf(ridersVault) >= estimatedDriveFee, "Low balance");
-        require(rd.registered == true, "not registered");
-        require(rd.ridepicked == false, "You have a ride in progress/you have balance to pay");
-        DriverDetails storage DD = driverdetails[_driver];
+        PassengerDetails storage pd = passengerDetails[msg.sender];
+        address passengerVault = address(pd.vaultAddress);
+        uint estimatedDriveFee = calFeeEstimate(_distance);
+        require(IERC20(tokenAddress).balanceOf(passengerVault) >= estimatedDriveFee, "Insufficient balance");
+        require(pd.registered == true, "not registered");
+        require(pd.ridepicked == false, "You have an active ride");
+        DriverDetails storage DD = driverDetails[_driver];
         require(DD.booked == false, "Rider booked");
         require(DD.available == true, "Driver not available");
         DD.rideRequest = true;
-        DD.currentRider = msg.sender;
-        rd.ridepicked = true;
+        DD.currentPassenger = msg.sender;
+        pd.ridepicked = true;
     }
 
-    function driverAcceptRide ()public {
-       DriverDetails storage DD = driverdetails[msg.sender];
-       require(DD.rideRequest == true, "No ride requested");
-       DD.booked = true;
-       DD.timePicked = block.timestamp;
+    function driverAcceptRide() public {
+        DriverDetails storage DD = driverDetails[msg.sender];
+        require(DD.rideRequest == true, "No ride requested");
+        DD.booked = true;
+        DD.timePicked = block.timestamp;
     }
   
 
     function endride() public{
-        DriverDetails storage dd = driverdetails[msg.sender];
-        RiderDetails storage rd = riderdetails[dd.currentRider];
+        DriverDetails storage dd = driverDetails[msg.sender];
+        PassengerDetails storage pd = passengerDetails[dd.currentPassenger];
         require(dd.booked == true, "you have no active ride");
         uint amount = calcRealFee(dd.driversAddress);
-        IERC20(tokenAddress).transferFrom(address(rd.vaultAddress), address(dd.vaultAddress), amount);
-        dd.currentRider = address(0);
+        IERC20(tokenAddress).transferFrom(address(pd.vaultAddress), address(dd.vaultAddress), amount);
+        dd.currentPassenger = address(0);
         dd.booked = false;
         dd.acceptRide = false;
         dd.rideRequest = false;
         dd.successfulRide += 1;
-        rd.ridepicked = false;
+        pd.ridepicked = false;
     }
 
     function calFeeEstimate (uint _distance) public view returns(uint estimateFee) {
@@ -136,14 +139,14 @@ contract Uber is Initializable, AccessControlUpgradeable{
     }
 
     function isUserInRide (address _owner) public view returns (bool rideOngoing) {
-        RiderDetails memory rd = riderdetails[_owner];
-        rideOngoing = rd.ridepicked;
+        PassengerDetails memory pd = passengerDetails[_owner];
+        rideOngoing = pd.ridepicked;
     }
 
     function calcRealFee(address driverAddress) internal view returns(uint256 amountToPay){
-        DriverDetails storage dd = driverdetails[driverAddress];
+        DriverDetails storage dd = driverDetails[driverAddress];
         uint totalTime = block.timestamp - dd.timePicked;
-         amountToPay = totalTime * driveFeePerTime;
+        amountToPay = totalTime * driveFeePerTime;
     }
 
 
@@ -162,12 +165,11 @@ contract Uber is Initializable, AccessControlUpgradeable{
     function viewAllDrivers () external view returns(address[] memory) {
         return driversAddress;
     }
-    function viewAllRiders () external view returns(address[] memory) {
-        return ridersAddress;
+    function viewAllPassengers () external view returns(address[] memory) {
+        return passengersAddress;
     }
 
     function changeTokenAddress(address _newTokenAddress) external{
         tokenAddress = _newTokenAddress;
     }
-    
 }

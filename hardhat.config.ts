@@ -14,9 +14,9 @@ const config: HardhatUserConfig = {
   },
   networks: {
     mumbai: {
-      url: process.env.ALCHEMY_GOERLI_API_KEY_URL,
+      url: process.env.ALCHEMY_MUMBAI_URL,
       // @ts-ignore
-      accounts: [process.env.ACCOUNT_PRIVATE_KEY]
+      accounts: [process.env.PRIVATE_KEY]
     }
   },
   etherscan: {
