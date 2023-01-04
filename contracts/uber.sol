@@ -6,7 +6,7 @@ pragma solidity ^0.8.9;
 import "./UserVault.sol";
 import "./DriverVault.sol";
 
-import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
+import "./AccessControlUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 
 contract Uber is Initializable, AccessControlUpgradeable{
