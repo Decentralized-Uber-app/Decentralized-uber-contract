@@ -41,7 +41,6 @@ describe ("Uber", () => {
             await uberr.connect(driver).driversRegister("Ayomide", 12345675);
             
             await expect (uberr.connect(driver).driversRegister("Ayomide", 12345675)).to.be.revertedWith("already registered");
-            
         })
 
     })
@@ -63,22 +62,27 @@ describe ("Uber", () => {
             await uberr.connect(driver).driversRegister("CAS", 9753687);
         
             await uberr.connect(reviewer).reviewDriver(driver.address);
-            await expect(uberr.connect(reviewer).reviewDriver(driver.address)).not.to.be.reverted;
+            await expect(uberr.connect(reviewer).reviewDriver(driver.address)).to.be.revertedWith("driver already approved");
         });
+    })
 
+    describe("CheckRoles", () => {
         it("Should revert if the address has not been granted REVIEWER_ROLE", async function(){
-            const {uberr, admin,reviewer, reviewer2, driver, REVIEWER_ROLE} = await loadFixture(deployLoadFixture);
+            const {uberr, admin, reviewer, reviewer2, driver, REVIEWER_ROLE} = await loadFixture(deployLoadFixture);
             await uberr.connect(driver).driversRegister("CAS", 89753687);
-
+    
             const AccessControl = await ethers.getContractAt("IAccessControlUpgradeable", uberr.address);
-            await AccessControl.connect(admin).grantRole(REVIEWER_ROLE, reviewer2.address);
 
+            await AccessControl.connect(admin).grantRole(REVIEWER_ROLE, reviewer2.address);
+    
             const HasRole =  await AccessControl.connect(admin).hasRole(REVIEWER_ROLE, reviewer2.address);
+
             //returns true/false if reviewer hasrole
             console.log("Checks if he address has role", HasRole)
-
+    
             await uberr.connect(reviewer).reviewDriver(driver.address);
-            await expect(uberr.connect(reviewer).reviewDriver(driver.address)).not.to.be.rejected;
+            
+            await expect(uberr.connect(reviewer).reviewDriver(driver.address)).revertedWith("driver already approved");
         })
     })
 
@@ -95,7 +99,8 @@ describe ("Uber", () => {
 
             await uberr.connect(reviewer).reviewDriver(driver2.address);
             await uberr.connect(passenger3).orderRide(driver2.address, 2345);
-            await expect(uberr.connect(passenger3).orderRide(driver2.address, 2345)).to.be.rejected;
+
+            await expect(uberr.connect(passenger3).orderRide(driver2.address, 2345)).revertedWith("you have active request");
             
         })
     })
@@ -108,22 +113,26 @@ describe ("Uber", () => {
             await uberr.connect(driver2).driversRegister("Sayrarh", 7875322);
 
             await uberr.connect(reviewer).reviewDriver(driver2.address);
-            await uberr.connect(passenger3).orderRide(driver2.address, 2345);
-            await uberr.connect(driver2).driverAcceptRide();
-            await expect(uberr.connect(driver2).driverAcceptRide()).not.to.be.rejected;
+            await uberr.connect(passenger3).orderRide(driver2.address, 2345);        
+
+            await expect(uberr.connect(driver2).driverAcceptRide())
+            .to.emit(uberr, "RideAccepted");
             
         })
     })
 
     describe("EndRide", () => {
         it("Should end a ride that already started and revert if no active ride", async function(){
-            const{uberr, reviewer,driver, driver2, passenger3} = await loadFixture(deployLoadFixture);
+            const{uberr, reviewer, driver, driver2, passenger3} = await loadFixture(deployLoadFixture);
+
             await uberr.connect(passenger3).passengerRegistration()
             await uberr.connect(driver).driversRegister("Sayrarh", 7875322);
 
             await uberr.connect(reviewer).reviewDriver(driver.address);
             await uberr.connect(passenger3).orderRide(driver.address, 2345);
+
             await uberr.connect(driver).driverAcceptRide();
+
             await uberr.connect(driver).endride();
             await expect(uberr.connect(driver).endride()).to.be.revertedWith("you have no active ride");
         })

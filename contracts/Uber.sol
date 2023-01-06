@@ -11,6 +11,9 @@ import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 
 contract Uber is Initializable, AccessControlUpgradeable{
 
+    // EVENTS
+    event RideAccepted(address indexed _driverAddres, uint256 indexed _timePicked);
+
     bytes32 public constant REVIEWER_ROLE = keccak256("REVIEWER_ROLE");
 
     // STATE VARIABLES //
@@ -22,6 +25,8 @@ contract Uber is Initializable, AccessControlUpgradeable{
     address tokenAddress;
     uint public driveFeePerTime;
     uint public driveFeePerDistance;
+
+    uint public rideCount;
 
     constructor(address _tokenAddress) {
         admin = msg.sender;
@@ -76,6 +81,7 @@ contract Uber is Initializable, AccessControlUpgradeable{
     function reviewDriver(address _driversAddress) public onlyRole(REVIEWER_ROLE){
         DriverDetails storage dd = driverDetails[_driversAddress];
         require(dd.driversAddress == _driversAddress, "Driver not registered");
+        require(dd.approved == false, "driver already approved");
         dd.approved = true;
 
         // deploy a new driver vault contract for the driver whose address is passed
@@ -98,14 +104,20 @@ contract Uber is Initializable, AccessControlUpgradeable{
 
     function orderRide(address _driver, uint _distance) public {
         PassengerDetails storage pd = passengerDetails[msg.sender];
+        DriverDetails storage DD = driverDetails[_driver];
+
+        if(DD.rideRequest == true && DD.currentPassenger == msg.sender){
+            revert("you have active request");
+        }
+
         address passengerVault = address(pd.vaultAddress);
         uint estimatedDriveFee = calFeeEstimate(_distance);
         require(IERC20(tokenAddress).balanceOf(passengerVault) >= estimatedDriveFee, "Insufficient balance");
         require(pd.registered == true, "not registered");
         require(pd.ridepicked == false, "You have an active ride");
-        DriverDetails storage DD = driverDetails[_driver];
+        
         require(DD.approved == true, "Driver approval pending");
-        require(DD.booked == false, "Rider booked");
+        require(DD.booked == false, "Passenger booked");
         DD.rideRequest = true;
         DD.currentPassenger = msg.sender;
         pd.ridepicked = true;
@@ -117,6 +129,9 @@ contract Uber is Initializable, AccessControlUpgradeable{
         require(DD.rideRequest == true, "No ride requested");
         DD.booked = true;
         DD.timePicked = block.timestamp;
+        rideCount += 1;
+
+        emit RideAccepted(msg.sender, DD.timePicked);
     }
   
 
