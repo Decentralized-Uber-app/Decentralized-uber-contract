@@ -42,7 +42,6 @@ contract Uber is Initializable, AccessControlUpgradeable{
         uint112 driversLicenseIdNo;
         bool registered;
         bool approved;
-        bool available;
         bool rideRequest; // When a user request for ride
         bool acceptRide; // Driver accepts requested
         bool booked; // When driver accepts ride
@@ -105,8 +104,8 @@ contract Uber is Initializable, AccessControlUpgradeable{
         require(pd.registered == true, "not registered");
         require(pd.ridepicked == false, "You have an active ride");
         DriverDetails storage DD = driverDetails[_driver];
+        require(DD.approved == true, "Driver approval pending");
         require(DD.booked == false, "Rider booked");
-        require(DD.available == true, "Driver not available");
         DD.rideRequest = true;
         DD.currentPassenger = msg.sender;
         pd.ridepicked = true;
@@ -114,6 +113,7 @@ contract Uber is Initializable, AccessControlUpgradeable{
 
     function driverAcceptRide() public {
         DriverDetails storage DD = driverDetails[msg.sender];
+        require(DD.registered == true, "not a driver");
         require(DD.rideRequest == true, "No ride requested");
         DD.booked = true;
         DD.timePicked = block.timestamp;
@@ -122,6 +122,7 @@ contract Uber is Initializable, AccessControlUpgradeable{
 
     function endride() public{
         DriverDetails storage dd = driverDetails[msg.sender];
+        require(dd.registered == true, "not a driver");
         PassengerDetails storage pd = passengerDetails[dd.currentPassenger];
         require(dd.booked == true, "you have no active ride");
         uint amount = calcRealFee(dd.driversAddress);
