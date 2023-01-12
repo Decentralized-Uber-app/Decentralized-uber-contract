@@ -174,9 +174,6 @@ contract Uber is Initializable, AccessControlUpgradeable{
         driveFeePerDistance = fee;
     }
 
-    function setContractAddress (address _tokenAddress) public {
-        tokenAddress = _tokenAddress;
-    }
 
     function viewAllDrivers () external view returns(address[] memory) {
         return driversAddress;
@@ -185,7 +182,7 @@ contract Uber is Initializable, AccessControlUpgradeable{
         return passengersAddress;
     }
 
-    function changeTokenAddress(address _newTokenAddress) external{
+    function changeTokenAddress(address _newTokenAddress) external onlyRole(DEFAULT_ADMIN_ROLE){
         tokenAddress = _newTokenAddress;
     }
 }
